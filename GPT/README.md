@@ -1,3 +1,3 @@
-# NLP_LAB_Task
+# GPT
 
-NLP에서 사용하는 모델을 구현. (Transformer, Bert, GPT)
+Transformer의 decoder만 사용하므로 decoder만 구현.
