@@ -1,3 +1,3 @@
-# NLP_LAB_Task
+# Transformer
 
-NLP에서 사용하는 모델을 구현. (Transformer, Bert, GPT)
+encoder와 deocer 모두 있기에 둘 다 model.py에 구현.
