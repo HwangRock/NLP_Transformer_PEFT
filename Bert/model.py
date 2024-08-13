@@ -127,13 +127,13 @@ class Encoder(nn.Module):
         # encoderblock을 한 layer로 가짐.
         self.layers = nn.ModuleList([EncoderBlock(self.config) for _ in range(self.config.n_layer)])
 
-    def forward(self, inputs, embeding):
+    def forward(self, inputs, segments):
         position = (torch.arange(inputs.size(1), device=inputs.size(), dtype=inputs.dtype).
                     expand(inputs.size(0), inputs.size(1)).contiguous()+1)
         pos_mask = inputs.eq(self.config.i_pad)  # inputs에 값이 0인 원소가 있으면 pos_mask는 그 자리에 true을 넣고 아니면 false을 넣음.
         position.masked_fill(pos_mask, 0)  # pos_mask가 true인 위치에 0으로 채움.
 
-        output = self.input_embed(inputs) + self.pos_embed(position) + self.seg_embed(embeding)  # 입력 임베딩을 다 넣어줌.
+        output = self.input_embed(inputs) + self.pos_embed(position) + self.seg_embed(segments)  # 입력 임베딩을 다 넣어줌.
 
         attn_probs = []
         attn_mask = padding(inputs, inputs, self.config.i_pad)

@@ -159,3 +159,29 @@ class Encoder(nn.Module):
             attn_probs.append(attn_prob)
 
         return output, attn_probs
+
+
+# Decoder에서 사용할 하나의 DecoderBlock을 작성한 코드. 마찬가지로 순서에 맞게 가져온다.
+class DecoderBlock(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.masked_attn = MultiHeadAttention(self.config)  # multi head attention을 위한 함수
+        self.dec_enc_attn = MultiHeadAttention(self.config)  # multi head attention을 위한 함수
+        self.layer_norm1 = nn.LayerNorm(self.config.d_hidn, eps=self.config.layer_norm_epsilon)
+        # masked multi head attention하고 정규화를 위함.
+        self.layer_norm2 = nn.LayerNorm(self.config.d_hidn, eps=self.config.layer_norm_epsilon)
+        # encoder-decoder multihead attention하고 정규화를 위함.
+        self.layer_norm3 = nn.LayerNorm(self.config.d_hidn, eps=self.config.layer_norm_epsilon)
+        # Feed forward neural net을 하고 정규화를 위함.
+        self.feedforward = Mlp(self.config)  # feed forwatd를 위한 함수
+
+    def forward(self, dec_inputs, enc_outputs, attn_mask, dec_enc_attn_mask):
+        attn_output, attn_prob = self.masked_attn(dec_inputs, dec_inputs, dec_inputs, attn_mask)
+        attn_output = self.layer_norm1(dec_inputs + attn_output)
+        dec_enc_output, dec_enc_attn_prob = self.dec_enc_attn(attn_output, enc_outputs, enc_outputs, dec_enc_attn_mask)
+        dec_enc_output = self.layer_norm2(dec_enc_output + attn_output)
+        output = self.feedforward(dec_enc_output)
+        output = self.layer_norm3(output + dec_enc_output)
+
+        return output, attn_prob, dec_enc_attn_prob
