@@ -99,9 +99,9 @@ class MultiHeadAttention(nn.Module):
 
         context, attn_prob = self.scale_dot_product(q, k, v, attn_mask)  # 계산한 Q, K, V를 셀프 어텐션 연산시킴.
         context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.config.d_head*self.config.n_head)
-        # 1번째와 2번째 자리를 바꿔서 기존으로 되돌리고, contiguous로 메모리를 연속적으로 재배열하고, view를 이용해서 헤드를 결합시킴.
+        # attention matrix들을 concatenate하는 부분.
 
-        context = self.linear(context)  # context의 차원을 되돌리기 위해서 선형변환 진행.
+        context = self.linear(context)  # attention head의 원래 크기로 되돌리기 위해 W0를 곱해서 크기를 줄임.
 
         return context, attn_prob
 
