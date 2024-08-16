@@ -4,14 +4,21 @@ import torch.nn.functional as f
 import numpy as np
 
 
-# attention에서 사용하는 padding을 확인하는 함수
-def padding(input_q, input_k, pad_num):
+# padding된 토큰을 무시하기 위한 함수.
+def padding_mask(input_q, input_k, pad_num):
     batch_size, len_q = input_q.size()
     batch_size, len_k = input_k.size()
 
     pad = input_k.detach().eq(pad_num).unsquezee(1).expand(batch_size, len_q, len_k)
 
     return pad
+
+
+# decoder에서 보지 않는 단어는 mask하기 위한 함수.
+def decoder_mask(seq):
+    mask = torch.ones_like(seq).unsqueeze(-1).expand(seq.size(0), seq.size(1), seq.size(1))
+    mask = mask.triu(diagonal=1)  # 행렬의 주대각선 위는 1로 채우고, 나머지는 0으로 채워서 다음 토큰을 마스크하게 함.
+    return mask
 
 
 # sinusodial에 기반해서 위치 임베딩을 계산하는 함수
@@ -152,7 +159,7 @@ class Encoder(nn.Module):
         output = self.input_embed(inputs) + self.pos_embed(position)  # 워드 임베딩과 위치 임베딩을 더해줌.(따지고보면 입력값)
 
         attn_probs = []
-        attn_mask = padding(inputs, inputs, self.config.i_pad)
+        attn_mask = padding_mask(inputs, inputs, self.config.i_pad)
 
         for layer in self.layers:  # encoder의 block에 순서대로 넣음.
             output, attn_prob = layer(output, attn_mask)
@@ -185,3 +192,53 @@ class DecoderBlock(nn.Module):
         output = self.layer_norm3(output + dec_enc_output)
 
         return output, attn_prob, dec_enc_attn_prob
+
+
+class Decoder(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+        self.input_embed = nn.Embedding(self.config.n_enc_vocab, self.config.d_hidn)  # 입력문장의 임베딩 벡터를 가져옴.
+        pos_val = torch.FloatTensor(calcul_location(self.config.n_enc_seq + 1, self.config.d_hidn))  # 위치 임베딩을 계산.
+        self.pos_embed = nn.Embedding.from_pretrained(pos_val, freeze=True)  # 위치 임베딩 값이 고정적이게 함.
+
+        # encoderblock을 한 layer로 가짐.
+        self.layers = nn.ModuleList([DecoderBlock(self.config) for _ in range(self.config.n_layer)])
+
+    def forward(self, inputs, enc_outputs):
+        position = (torch.arange(inputs.size(1), device=inputs.size(), dtype=inputs.dtype).
+                    expand(inputs.size(0), inputs.size(1)).contiguous() + 1)
+        pos_mask = inputs.eq(self.config.i_pad)  # inputs에 값이 0인 원소가 있으면 pos_mask는 그 자리에 true을 넣고 아니면 false을 넣음.
+        position.masked_fill(pos_mask, 0)  # pos_mask가 true인 위치에 0으로 채움.
+
+        output = self.input_embed(inputs) + self.pos_embed(position)  # 워드 임베딩과 위치 임베딩을 더해줌.(따지고보면 입력값)
+        dec_token_padding = padding_mask(inputs, inputs, self.config.i_pad)
+        dec_next_padding = decoder_mask(inputs)
+        dec_mask = torch.gt((dec_token_padding or dec_next_padding), 0)
+        dec_enc_mask = padding_mask(inputs, enc_outputs, self.config.i_pad)
+
+        masked_probs = []
+        dec_enc_probs = []
+        for layer in self.layers:
+            output, masked_prob, dec_enc_prob = layer(output, enc_outputs, dec_mask, dec_enc_mask)
+            masked_probs.append(masked_prob)
+            dec_enc_probs.append(dec_enc_prob)
+
+        return output, masked_probs, dec_enc_probs
+
+
+class Transformer(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+        self.encoder = Encoder(self.config)
+        self.decoder = Decoder(self.config)
+
+    def forward(self, enc_inputs, dec_inputs):
+        enc_outputs, enc_prob = self.encoder(enc_inputs)
+
+        dec_outputs, dec_prob, dec_enc_prob = self.decoder(dec_inputs, enc_outputs)
+
+        return dec_outputs, enc_prob, dec_prob, dec_enc_prob
