@@ -7,10 +7,12 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 
 ## 실험 환경
 
-- GPU : RTX3060
+- GPU : NVIDIA RTX3060
 - Language : Python 3.10.12
 - Framework : Pytorch
-- model matrix: GLUE (avg)	SST-2	MNLI	QNLI	QQP	CoLA	STS
+- model : vanila transformer
+- Expriment task : SST-2, MNLI, QNLI
+- model matrix: Accuracy, F1, GLUE avg
 
 ---
 
