@@ -5,6 +5,15 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 
 ---
 
+## 실험 환경
+
+- GPU : RTX3060
+- Language : Python 3.10.12
+- Framework : Pytorch
+- model matrix: GLUE (avg)	SST-2	MNLI	QNLI	QQP	CoLA	STS
+
+---
+
 ## 구현 Task
 - Transformer : 2024-08-09 ~ 2024-08-16 구현 완료
 - Adapter
