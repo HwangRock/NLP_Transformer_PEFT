@@ -2,24 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 from model.embedding import calcul_location
-
-
-# padding된 토큰을 무시하기 위한 함수.
-def padding_mask(input_q, input_k, pad_num):
-    batch_size, len_q = input_q.size()
-    batch_size, len_k = input_k.size()
-
-    pad = input_k.detach().eq(pad_num).unsquezee(1).expand(batch_size, len_q, len_k)
-
-    return pad
-
-
-# decoder에서 보지 않는 단어는 mask하기 위한 함수.
-def decoder_mask(seq):
-    mask = torch.ones_like(seq).unsqueeze(-1).expand(seq.size(0), seq.size(1), seq.size(1))
-    mask = mask.triu(diagonal=1)  # 행렬의 주대각선 위는 1로 채우고, 나머지는 0으로 채워서 다음 토큰을 마스크하게 함.
-    return mask
-
+from mask import padding_mask, decoder_mask
 
 
 # fully connected layer를 사용하기 위한 함수.
@@ -50,7 +33,7 @@ class SelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.scale = 1/self.config.d_head**0.5  # 차원의 제곱근으로 나눔. 정규화의 과정.
+        self.scale = 1 / self.config.d_head ** 0.5  # 차원의 제곱근으로 나눔. 정규화의 과정.
 
     def forward(self, q, k, v, attn_mask):
         score_matrix = torch.matmul(q, k.transpose(-1, -2)).mul(self.scale)
@@ -91,7 +74,7 @@ class MultiHeadAttention(nn.Module):
         # repeat을 통해서 (batch_size, n_head, 차원, 차원)으로 attn_mask의 차원을 변환.
 
         context, attn_prob = self.scale_dot_product(q, k, v, attn_mask)  # 계산한 Q, K, V를 셀프 어텐션 연산시킴.
-        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.config.d_head*self.config.n_head)
+        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.config.d_head * self.config.n_head)
         # attention matrix들을 concatenate하는 부분.
 
         context = self.linear(context)  # attention head의 원래 크기로 되돌리기 위해 W0를 곱해서 크기를 줄임.
@@ -138,7 +121,7 @@ class Encoder(nn.Module):
 
     def forward(self, inputs):
         position = (torch.arange(inputs.size(1), device=inputs.size(), dtype=inputs.dtype).
-                    expand(inputs.size(0), inputs.size(1)).contiguous()+1)
+                    expand(inputs.size(0), inputs.size(1)).contiguous() + 1)
         pos_mask = inputs.eq(self.config.i_pad)  # inputs에 값이 0인 원소가 있으면 pos_mask는 그 자리에 true을 넣고 아니면 false을 넣음.
         position.masked_fill(pos_mask, 0)  # pos_mask가 true인 위치에 0으로 채움.
 
