@@ -4,29 +4,7 @@ import torch.nn.functional as f
 from model.embedding import calcul_location
 from mask import padding_mask, decoder_mask
 from model.attention import MultiHeadAttention
-
-
-# fully connected layer를 사용하기 위한 함수.
-class Mlp(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-
-        self.dimension = config.d_hidn
-        self.network = config.d_ff
-
-        self.layer1 = nn.Linear(self.dimension, self.network)
-        self.layer2 = nn.Linear(self.network, self.dimension)
-
-        self.active = f.relu
-        self.dropout = nn.Dropout(config.dropout)
-
-    def forward(self, x):
-        x = self.active(self.layer1(x))
-        x = self.dropout(x)
-        x = self.layer2(x)
-
-        return x
+from model.layers import Mlp
 
 
 # Encoder에서 사용할 하나의 EncoderBlock을 작성한 코드. 위에서 작성한 multi head attention과 mlp 연산을 순서에 맞게 가져와서 사용하면 됨.
