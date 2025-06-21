@@ -1,6 +1,6 @@
 import torch.nn as nn
-from model.encoder import Encoder
-from model.decoder import Decoder
+from encoder import Encoder
+from decoder import Decoder
 
 
 # 전체적인 transformer의 틀. encoder를 실행하고 decoder를 실행함.

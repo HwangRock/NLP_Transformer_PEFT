@@ -48,7 +48,7 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 그 이유는 이전까지 해결되지 않았던 RNN의 long-term dependency problem을 해결했기 때문입니다.  
 </br>
 이 문제는 RNN의 계산 구조에서 비롯됩니다. 아래와 같은 recurrence relation을 보면,</br>  
-$h_t$ = f($W_h$ $h_{t-1}$ + $W_x$ $x_t$ + b)
+$h_t$ = f( $W_h$ $h_{t-1}$ + $W_x$ $x_t$ + b )
 </br>
 
 여기서 현재 hidden state $h_t$는 오직 직전 hidden state $h_{t-1}$에만 의존합니다.  
