@@ -43,6 +43,8 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 - Masking
 - Encoder-Decoder Architecture
 
+-----
+
 #### 정리
 
 ##### self-Attention
@@ -84,6 +86,8 @@ self attention은 한 시퀀스 내의 토큰끼리의 의미적 관계와 중�
   중요도를 나타내는 벡터의 수들을 확률로 표현하기 위해서 softmax() 함수에 넣어서 정규화해줍니다.  </br></br>
 - 중요도 결과 계산 : V 행렬과 곱
   softmax를 취해서 중요도를 나타내는 행렬과 입력 시퀀스의 정보를 나타내는 V 행렬의 곱을 통해서 토큰의 중요도를 계산해줍니다.
+
+-----
 
 ##### Multi-Head Attention
 
