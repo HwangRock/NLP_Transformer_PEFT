@@ -31,16 +31,16 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 
 논문에 생략된 수학적인 내용도 정확하게 짚고 싶어서 선형대수학 및 확률론의 내용을 세부 설명없이 사용했습니다.
 
-[Transformer](###Transformer)
+[Transformer](#Transformer)
 
 ### Transformer
 
 #### 주요 개념
 
-- Self-Attention
-- Multi-Head Attention
-- Positional Encoding
-- Masking
+- [Self-Attention](#self-Attention)
+- [Multi-Head Attention](#Multi-Head-Attention)
+- [Positional Encoding](#Positional-Encoding)
+- [Masking](#Masking)
 - Encoder-Decoder Architecture
 
 -----
