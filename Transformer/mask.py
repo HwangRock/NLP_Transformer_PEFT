@@ -6,7 +6,7 @@ def padding_mask(input_q, input_k, pad_num):
     batch_size, len_q = input_q.size()
     batch_size, len_k = input_k.size()
 
-    pad = input_k.detach().eq(pad_num).unsquezee(1).expand(batch_size, len_q, len_k)
+    pad = input_k.detach().eq(pad_num).unsqueeze(1).expand(batch_size, len_q, len_k)
 
     return pad
 
