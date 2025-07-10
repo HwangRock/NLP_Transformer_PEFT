@@ -143,6 +143,7 @@ sin이나 cos 하나만 사용될 경우에는 i가 커질수록 원소가 증�
 이 문제를 해결하기 위해서 Transformer에서는 현재 시점 이후의 토큰들을 mask하여 보지 못하도록 처리합니다.  
 
 ###### How to operate?
+
 Masking은 Attention Score를 계산할 때 적용됩니다.
 Transformer에서 Attention을 수행할 때, Q와 K의 내적을 통해 각 토큰 간 유사도를 나타내는 행렬을 구하지만,  
 Decoder의 경우 문장을 생성하는 과정에서 아직 생성되지 않은 미래의 토큰을 참조하지 못하게 해야 합니다.  
@@ -152,3 +153,15 @@ Decoder의 경우 문장을 생성하는 과정에서 아직 생성되지 않은
 </br>
 이렇게 Masking을 적용하면, softmax와 V 행렬 곱 연산 후 미래 토큰의 정보가 attention 계산에 반영되지 않게 되서,
 결과적으로 Transformer의 Decoder는 Auto-Regressive 모델처럼 작동하며, 문장 생성 시 올바른 순서로 토큰을 생성할 수 있게 됩니다.
+
+-----
+
+##### Encoder-Decoder Architecture
+
+###### Why use?
+
+Encoder-Decoder Architecture는 입력 시퀀스를 다른 시퀀스로 변환하는 Seq2Seq 문제에서 많이 쓰이는 구조입니다.  
+그 이유는 Seq2Seq는 입력과 출력 간에 관계를 파악해야 하므로 이런 상황에 벡터가 중간 다리 역할을 해야 하기 때문입니다.  
+</br>
+만약 중간 다리로 벡터를 쓰지 않는다면 입력 문장과 출력 문장의 토큰 수가 다를 때 처리할 수 없게 되고, 문장의 context를 볼 수 없게 되고,  
+학습에서 가중치 갱신을 할 수 없다는 문제가 발생하기에 Encoder-Decoder Architecture를 사용해야 합니다.  
