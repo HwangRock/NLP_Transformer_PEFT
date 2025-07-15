@@ -9,6 +9,9 @@ def main():
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     tokenizer, model, adapter = build_bert_with_adapter(config)
     optimizer = torch.optim.Adam(adapter.parameters(), lr=config["learning_rate"])
     sentences = config["sentences"]  # 나중에 dataset 추가하고 변경해야함!!!!
