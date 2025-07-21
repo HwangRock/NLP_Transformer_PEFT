@@ -1,8 +1,10 @@
 import json
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from bert_adapter_model import build_bert_with_adapter
 from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import f1_score, accuracy_score
+from bert_adapter_model import build_bert_with_adapter
 
 
 def main():
@@ -14,51 +16,69 @@ def main():
     print(f"Using device: {device}")
 
     tokenizer, model, adapter = build_bert_with_adapter(config)
-
     model.to(device)
     adapter.to(device)
 
     optimizer = torch.optim.Adam(adapter.parameters(), lr=config["learning_rate"])
-    sentences = config["sentences"]  # 나중에 dataset 추가하고 변경해야함!!!!
+    writer = SummaryWriter(log_dir="./runs/adapter_experiment")
 
-    inputs = tokenizer(
-        sentences,
+    classifier = nn.Linear(config["hidden_size"], 1).to(device)
+    criterion = nn.BCEWithLogitsLoss()
+
+    dataset = config["dataset"]
+
+    inputs1 = tokenizer(
+        [x["sent1"] for x in dataset],
         return_tensors="pt",
         padding=True,
         truncation=True,
         max_length=config["max_length"],
-    )
+    ).to(device)
 
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    inputs2 = tokenizer(
+        [x["sent2"] for x in dataset],
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=config["max_length"],
+    ).to(device)
 
-    writer = SummaryWriter(log_dir="./runs/adapter_experiment")
+    labels = torch.tensor([x["label"] for x in dataset], dtype=torch.float).unsqueeze(1).to(device)
 
-    best_loss = float("inf")
+    best_f1 = 0.0
 
     for epoch in range(config["num_epochs"]):
         model.train()
+        classifier.train()
 
-        outputs = model(**inputs)
-        embeddings = outputs.last_hidden_state
+        cls_emb1 = model(**inputs1).last_hidden_state[:, 0, :]
+        cls_emb2 = model(**inputs2).last_hidden_state[:, 0, :]
 
-        cls_emb1 = embeddings[0, 0, :]
-        cls_emb2 = embeddings[1, 0, :]
+        features = torch.abs(cls_emb1 - cls_emb2)
 
-        cos_sim = F.cosine_similarity(cls_emb1.unsqueeze(0), cls_emb2.unsqueeze(0))
-        loss = 1 - cos_sim
+        logits = classifier(features)
+        loss = criterion(logits, labels)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        print(f"Epoch {epoch + 1}/{config['num_epochs']} - Loss: {loss.item():.4f}")
-        writer.add_scalar("Loss/train", loss.item(), epoch)
-        writer.add_scalar("CosineSimilarity/train", cos_sim.item(), epoch)
+        probs = torch.sigmoid(logits).detach().cpu().numpy()
+        preds = (probs > 0.5).astype(int)
+        true = labels.detach().cpu().numpy()
 
-        if loss.item() < best_loss:
-            best_loss = loss.item()
+        f1 = f1_score(true, preds)
+        acc = accuracy_score(true, preds)
+
+        print(f"Epoch {epoch + 1}/{config['num_epochs']} - Loss: {loss.item():.4f} - F1: {f1:.4f} - Acc: {acc:.4f}")
+        writer.add_scalar("Loss/train", loss.item(), epoch)
+        writer.add_scalar("F1/train", f1, epoch)
+        writer.add_scalar("Accuracy/train", acc, epoch)
+
+        if f1 > best_f1:
+            best_f1 = f1
             torch.save(adapter.state_dict(), f"adapter_best_epoch{epoch + 1}.pth")
-            print(f"New best model saved at epoch {epoch + 1} with loss {best_loss:.4f}")
+            print(f"Best model saved at epoch {epoch + 1} (F1: {f1:.4f})")
 
     writer.close()
 
