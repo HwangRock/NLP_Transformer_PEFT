@@ -44,7 +44,7 @@ def main():
         model.train()
         classifier.train()
 
-        cls_emb = model(**train_inputs).last_hidden_state[:, 0, :]  # [CLS]
+        cls_emb = model(**train_inputs).last_hidden_state[:, 0, :]
         logits = classifier(cls_emb)
         loss = criterion(logits, train_labels)
 
@@ -64,10 +64,38 @@ def main():
         writer.add_scalar("F1/train", f1, epoch)
         writer.add_scalar("Accuracy/train", acc, epoch)
 
-        if f1 > best_f1:
-            best_f1 = f1
-            torch.save(adapter.state_dict(), f"adapter_best_epoch{epoch + 1}.pth")
-            print(f"Best model saved at epoch {epoch + 1} (F1: {f1:.4f})")
+        model.eval()
+        classifier.eval()
+
+        with torch.no_grad():
+            val_inputs = tokenizer(
+                val_data["sentence"],
+                padding=True,
+                truncation=True,
+                max_length=config["max_length"],
+                return_tensors="pt"
+            ).to(device)
+
+            val_labels = torch.tensor(val_data["label"], dtype=torch.float).unsqueeze(1).to(device)
+
+            val_cls_emb = model(**val_inputs).last_hidden_state[:, 0, :]
+            val_logits = classifier(val_cls_emb)
+
+            val_probs = torch.sigmoid(val_logits).cpu().numpy()
+            val_preds = (val_probs > 0.5).astype(int)
+            val_true = val_labels.cpu().numpy()
+
+            val_f1 = f1_score(val_true, val_preds)
+            val_acc = accuracy_score(val_true, val_preds)
+
+            print(f"→ Validation - F1: {val_f1:.4f} - Acc: {val_acc:.4f}")
+            writer.add_scalar("F1/val", val_f1, epoch)
+            writer.add_scalar("Accuracy/val", val_acc, epoch)
+
+            if val_f1 > best_f1:
+                best_f1 = val_f1
+                torch.save(adapter.state_dict(), f"adapter_best_epoch{epoch + 1}.pth")
+                print(f"Best model saved at epoch {epoch + 1} (val_F1: {val_f1:.4f})")
 
     writer.close()
 
