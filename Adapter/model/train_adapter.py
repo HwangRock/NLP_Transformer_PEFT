@@ -1,11 +1,12 @@
 import json
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
 from sklearn.metrics import f1_score, accuracy_score
 from bert_adapter_model import build_bert_with_adapter
 from datasets import load_dataset
+from Adapter.utils.SST2Dataset import SST2Dataset
 
 
 def main():
@@ -30,72 +31,87 @@ def main():
     train_data = dataset["train"]
     val_data = dataset["validation"]
 
-    train_inputs = tokenizer(
-        train_data["sentence"],
-        padding=True,
-        truncation=True,
-        max_length=config["max_length"],
-        return_tensors="pt"
-    ).to(device)
-    train_labels = torch.tensor(train_data["label"], dtype=torch.float).unsqueeze(1).to(device)
+    train_encodings = tokenizer(train_data["sentence"], padding=True, truncation=True,
+                                max_length=config["max_length"], return_tensors="pt")
+    val_encodings = tokenizer(val_data["sentence"], padding=True, truncation=True,
+                              max_length=config["max_length"], return_tensors="pt")
+
+    train_labels = torch.tensor(train_data["label"], dtype=torch.float)
+    val_labels = torch.tensor(val_data["label"], dtype=torch.float)
+
+    train_dataset = SST2Dataset(train_encodings, train_labels)
+    val_dataset = SST2Dataset(val_encodings, val_labels)
+
+    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=False)
+
     best_f1 = 0.0
 
     for epoch in range(config["num_epochs"]):
         model.train()
         classifier.train()
+        total_loss = 0
+        all_preds = []
+        all_labels = []
 
-        cls_emb = model(**train_inputs).last_hidden_state[:, 0, :]
-        logits = classifier(cls_emb)
-        loss = criterion(logits, train_labels)
+        for batch in train_loader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            cls_emb = outputs.last_hidden_state[:, 0, :]
+            logits = classifier(cls_emb)
+            loss = criterion(logits, batch["labels"].unsqueeze(1))
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        probs = torch.sigmoid(logits).detach().cpu().numpy()
-        preds = (probs > 0.5).astype(int)
-        true = train_labels.detach().cpu().numpy()
+            total_loss += loss.item()
+            probs = torch.sigmoid(logits).detach().cpu().numpy()
+            preds = (probs > 0.5).astype(int)
+            labels = batch["labels"].cpu().numpy().reshape(-1, 1)
+            all_preds.extend(preds)
+            all_labels.extend(labels)
 
-        f1 = f1_score(true, preds)
-        acc = accuracy_score(true, preds)
+        train_f1 = f1_score(all_labels, all_preds)
+        train_acc = accuracy_score(all_labels, all_preds)
+        avg_loss = total_loss / len(train_loader)
 
-        print(f"Epoch {epoch + 1}/{config['num_epochs']} - Loss: {loss.item():.4f} - F1: {f1:.4f} - Acc: {acc:.4f}")
-        writer.add_scalar("Loss/train", loss.item(), epoch)
-        writer.add_scalar("F1/train", f1, epoch)
-        writer.add_scalar("Accuracy/train", acc, epoch)
+        print(
+            f"Epoch {epoch + 1}/{config['num_epochs']} - Loss: {avg_loss:.4f} - F1: {train_f1:.4f} - Acc: {train_acc:.4f}")
+        writer.add_scalar("Loss/train", avg_loss, epoch)
+        writer.add_scalar("F1/train", train_f1, epoch)
+        writer.add_scalar("Accuracy/train", train_acc, epoch)
 
         model.eval()
         classifier.eval()
+        val_preds = []
+        val_labels_all = []
 
         with torch.no_grad():
-            val_inputs = tokenizer(
-                val_data["sentence"],
-                padding=True,
-                truncation=True,
-                max_length=config["max_length"],
-                return_tensors="pt"
-            ).to(device)
+            for batch in val_loader:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                cls_emb = outputs.last_hidden_state[:, 0, :]
+                logits = classifier(cls_emb)
 
-            val_labels = torch.tensor(val_data["label"], dtype=torch.float).unsqueeze(1).to(device)
+                probs = torch.sigmoid(logits).cpu().numpy()
+                preds = (probs > 0.5).astype(int)
+                labels = batch["labels"].cpu().numpy().reshape(-1, 1)
 
-            val_cls_emb = model(**val_inputs).last_hidden_state[:, 0, :]
-            val_logits = classifier(val_cls_emb)
+                val_preds.extend(preds)
+                val_labels_all.extend(labels)
 
-            val_probs = torch.sigmoid(val_logits).cpu().numpy()
-            val_preds = (val_probs > 0.5).astype(int)
-            val_true = val_labels.cpu().numpy()
+        val_f1 = f1_score(val_labels_all, val_preds)
+        val_acc = accuracy_score(val_labels_all, val_preds)
 
-            val_f1 = f1_score(val_true, val_preds)
-            val_acc = accuracy_score(val_true, val_preds)
+        print(f"→ Validation - F1: {val_f1:.4f} - Acc: {val_acc:.4f}")
+        writer.add_scalar("F1/val", val_f1, epoch)
+        writer.add_scalar("Accuracy/val", val_acc, epoch)
 
-            print(f"→ Validation - F1: {val_f1:.4f} - Acc: {val_acc:.4f}")
-            writer.add_scalar("F1/val", val_f1, epoch)
-            writer.add_scalar("Accuracy/val", val_acc, epoch)
-
-            if val_f1 > best_f1:
-                best_f1 = val_f1
-                torch.save(adapter.state_dict(), f"adapter_best_epoch{epoch + 1}.pth")
-                print(f"Best model saved at epoch {epoch + 1} (val_F1: {val_f1:.4f})")
+        if val_f1 > best_f1:
+            best_f1 = val_f1
+            torch.save(adapter.state_dict(), f"adapter_best_epoch{epoch + 1}.pth")
+            print(f"Best model saved at epoch {epoch + 1} (val_F1: {val_f1:.4f})")
 
     writer.close()
 

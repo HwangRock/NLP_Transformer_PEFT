@@ -3,6 +3,7 @@
   "hidden_size": 768,
   "adapter_size": 64,
   "learning_rate": 5e-5,
+  "batch_size": 32,
   "num_epochs": 5,
   "max_length": 128
 }
