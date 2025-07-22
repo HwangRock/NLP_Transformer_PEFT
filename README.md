@@ -10,20 +10,19 @@ Pytorch로 Transformer를 코드 레벨에서 구현하고,
 - GPU : NVIDIA RTX3060
 - Language : Python 3.10.12
 - Framework : Pytorch
-- Model : vanila transformer
-- Experiment task : SST-2, MNLI, QNLI
-- Model matrix: Accuracy, F1, GLUE avg
+- Model : Pretrained BERT vs. PEFT BERT
+- Experiment task : Sentence-level Classification
+- Dataset : GLUE Benchmark - SST-2
+- Evaluation Metrics: Accuracy, F1-score, GLUE Average
 
 ---
 
 ## 구현 Task
 
 - Transformer : 2024-08-09 ~ 2024-08-16 구현 완료
-- Adapter : 2025-07-14 ~ 
+- Adapter : 2025-07-14 ~ 2025-07-22 구현 완료
 - LoRA
 - P-tuning
-- Prompt tuning
-- Prefix tuning
 
 ---
 
