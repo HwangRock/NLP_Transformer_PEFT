@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score, accuracy_score
 from bert_adapter_model import build_bert_with_adapter
+from datasets import load_dataset
 
 
 def main():
@@ -25,39 +26,27 @@ def main():
     classifier = nn.Linear(config["hidden_size"], 1).to(device)
     criterion = nn.BCEWithLogitsLoss()
 
-    dataset = config["dataset"]
+    dataset = load_dataset("glue", "sst2")
+    train_data = dataset["train"]
+    val_data = dataset["validation"]
 
-    inputs1 = tokenizer(
-        [x["sent1"] for x in dataset],
-        return_tensors="pt",
+    train_inputs = tokenizer(
+        train_data["sentence"],
         padding=True,
         truncation=True,
         max_length=config["max_length"],
+        return_tensors="pt"
     ).to(device)
-
-    inputs2 = tokenizer(
-        [x["sent2"] for x in dataset],
-        return_tensors="pt",
-        padding=True,
-        truncation=True,
-        max_length=config["max_length"],
-    ).to(device)
-
-    labels = torch.tensor([x["label"] for x in dataset], dtype=torch.float).unsqueeze(1).to(device)
-
+    train_labels = torch.tensor(train_data["label"], dtype=torch.float).unsqueeze(1).to(device)
     best_f1 = 0.0
 
     for epoch in range(config["num_epochs"]):
         model.train()
         classifier.train()
 
-        cls_emb1 = model(**inputs1).last_hidden_state[:, 0, :]
-        cls_emb2 = model(**inputs2).last_hidden_state[:, 0, :]
-
-        features = torch.abs(cls_emb1 - cls_emb2)
-
-        logits = classifier(features)
-        loss = criterion(logits, labels)
+        cls_emb = model(**train_inputs).last_hidden_state[:, 0, :]  # [CLS]
+        logits = classifier(cls_emb)
+        loss = criterion(logits, train_labels)
 
         optimizer.zero_grad()
         loss.backward()
@@ -65,7 +54,7 @@ def main():
 
         probs = torch.sigmoid(logits).detach().cpu().numpy()
         preds = (probs > 0.5).astype(int)
-        true = labels.detach().cpu().numpy()
+        true = train_labels.detach().cpu().numpy()
 
         f1 = f1_score(true, preds)
         acc = accuracy_score(true, preds)

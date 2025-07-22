@@ -4,9 +4,5 @@
   "adapter_size": 64,
   "learning_rate": 5e-5,
   "num_epochs": 5,
-  "max_length": 128,
-  "sentences": [
-    "Hello, this is a test sentence.",
-    "Another example sentence for testing."
-  ]
+  "max_length": 128
 }
